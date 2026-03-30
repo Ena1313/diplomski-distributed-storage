@@ -1,0 +1,14 @@
+FROM node:20
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+RUN mkdir -p /app/data /app/uploads /app/segments
+
+EXPOSE 3000
+
+CMD ["npm", "start"]

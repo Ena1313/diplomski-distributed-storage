@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+big.bin
+big2.bin
+downloaded_*.bin
