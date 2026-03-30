@@ -43,15 +43,16 @@ Docker se koristi za pokretanje backend servisa i storage nodeova putem docker-c
 
 ## Pokretanje projekta
 ### 1. Docker Desktop
-Najprije je potrebno pokrenuti Docker Desktop i pricekati da starta.
+Najprije je potrebno pokrenuti Docker Desktop i pričekati da starta.
 
 ### 2. Backend + nodeovi
 
-Zatim je potrebno ući u backend folder
-cd backend  
-i pokrenuti u terminalu:
+Zatim je potrebno ući u backend folder i pokrenuti:
+```
+cd backend
 npm install
-docker compose up --build  
+docker compose up --build
+```
 
 Backend je dostupan na:  
 http://localhost:3000  
@@ -60,9 +61,11 @@ http://localhost:3000
 
 ### 3. Frontend
 
+```
 cd frontend  
 npm install  
 npm run dev  
+```
 
 Frontend je dostupan na:  
 http://localhost:5173  
@@ -102,7 +105,8 @@ http://localhost:5173
 
 ### Simulacija gubitka replika
 
-- moguće je ručno obrisati replike iz storage foldera nodeova (npr. backend/node-data/node-2/<fileId>/chunk-00000.bin)
+- moguće je ručno obrisati replike iz storage foldera nodeova
+  (npr. `backend/node-data/node-2/<fileId>/chunk-00000.bin`)
 - ovisno o stanju:
   - ako postoji barem jedna replika → datoteka je **Degraded**
   - ako ne postoji nijedna replika → datoteka je **Missing**
