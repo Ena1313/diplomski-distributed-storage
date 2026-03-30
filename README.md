@@ -36,14 +36,14 @@ Storage nodeovi:
 
 Za pokretanje projekta potrebno je imati instalirano:
 
-- Docker (Docker Desktop)
+- Docker Desktop: https://www.docker.com/products/docker-desktop/
 - Node.js (za pokretanje frontend aplikacije)
 
 Docker se koristi za pokretanje backend servisa i storage nodeova putem docker-compose konfiguracije.
 
 ## Pokretanje projekta
 ### 1. Docker Desktop
-Najprije je potrebno pokrenuti Docker Desktop i pričekati da starta.
+Najprije je potrebno pokrenuti Docker Desktop i pričekati da se Docker potpuno pokrene (status "running").
 
 ### 2. Backend + nodeovi
 
