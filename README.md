@@ -105,11 +105,11 @@ http://localhost:5173
 
 ### Simulacija gubitka replika
 
-- moguće je ručno obrisati replike iz storage foldera nodeova
-  (npr. `backend/node-data/node-2/<fileId>/chunk-00000.bin`)
-- ovisno o stanju:
-  - ako postoji barem jedna replika → datoteka je **Degraded**
-  - ako ne postoji nijedna replika → datoteka je **Missing**
+Za potrebe demonstracije, gubitak replika simulira se uklanjanjem zapisa iz baze podataka (`segment_replicas`).
+
+Stanja sustava:
+- ako postoji barem jedna replika → datoteka je **Degraded**
+- ako ne postoji nijedna replika → datoteka je **Missing**
 
 ---
 
