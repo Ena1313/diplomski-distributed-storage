@@ -1,7 +1,11 @@
 const axios = require("axios");
 
+const axiosInstance = axios.create({
+    timeout: 3000,
+});
+
 async function storeSegmentOnNode(nodeBaseUrl, fileId, chunkName, chunkBuffer) {
-    const res = await axios.post(`${nodeBaseUrl}/store-segment`, {
+    const res = await axiosInstance.post(`${nodeBaseUrl}/store-segment`, {
         fileId,
         chunkName,
         contentBase64: chunkBuffer.toString("base64"),
@@ -11,7 +15,7 @@ async function storeSegmentOnNode(nodeBaseUrl, fileId, chunkName, chunkBuffer) {
 }
 
 async function fetchSegmentFromNode(nodeBaseUrl, fileId, chunkName) {
-    const res = await axios.get(`${nodeBaseUrl}/segment`, {
+    const res = await axiosInstance.get(`${nodeBaseUrl}/segment`, {
         params: { fileId, chunkName },
     });
 
@@ -19,7 +23,7 @@ async function fetchSegmentFromNode(nodeBaseUrl, fileId, chunkName) {
 }
 
 async function deleteSegmentFromNode(nodeBaseUrl, fileId, chunkName) {
-    const res = await axios.delete(`${nodeBaseUrl}/segment`, {
+    const res = await axiosInstance.delete(`${nodeBaseUrl}/segment`, {
         params: { fileId, chunkName },
     });
 
