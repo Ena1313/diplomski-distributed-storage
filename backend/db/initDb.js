@@ -13,6 +13,9 @@ function seedDefaultNodes() {
     { name: 'node-1', baseUrl: 'http://node-1:4001' },
     { name: 'node-2', baseUrl: 'http://node-2:4001' },
     { name: 'node-3', baseUrl: 'http://node-3:4001' },
+    { name: 'node-4', baseUrl: 'http://node-4:4001' },
+    { name: 'node-5', baseUrl: 'http://node-5:4001' },
+    { name: 'node-6', baseUrl: 'http://node-6:4001' },
   ];
 
   for (const node of defaultNodes) {

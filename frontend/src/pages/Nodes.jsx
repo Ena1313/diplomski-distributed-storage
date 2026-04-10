@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import api, { fetchNodesOverview } from "../services/api";
 
@@ -27,8 +27,6 @@ function StatusChip({ isActive }) {
 function Nodes() {
   const [nodes, setNodes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [rebalanceResult, setRebalanceResult] = useState(null);
 
@@ -68,27 +66,6 @@ function Nodes() {
     } catch (error) {
       console.error("Error deleting node:", error);
       alert("Failed to delete node.");
-    }
-  };
-
-  const handleAddNode = async () => {
-    if (!name.trim() || !baseUrl.trim()) {
-      alert("Please enter node name and base URL.");
-      return;
-    }
-
-    try {
-      await api.post("/nodes", {
-        name,
-        baseUrl,
-      });
-
-      setName("");
-      setBaseUrl("");
-      await loadData();
-    } catch (error) {
-      console.error("Error adding node:", error);
-      alert("Failed to add node.");
     }
   };
 
@@ -154,7 +131,7 @@ function Nodes() {
               Nodes
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Manage storage nodes, filter by status and rebalance the cluster
+              Manage prepared storage nodes, filter by status and rebalance the cluster
             </Typography>
           </Box>
 
@@ -193,32 +170,6 @@ function Nodes() {
           flexWrap="wrap"
           sx={{ mb: 3 }}
         >
-          <TextField
-            label="Node name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            size="small"
-            sx={{
-              minWidth: 180,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-              },
-            }}
-          />
-
-          <TextField
-            label="Base URL"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            size="small"
-            sx={{
-              minWidth: 250,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-              },
-            }}
-          />
-
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel>Status filter</InputLabel>
             <Select
@@ -232,21 +183,6 @@ function Nodes() {
               <MenuItem value="inactive">Inactive</MenuItem>
             </Select>
           </FormControl>
-
-          <Button
-            variant="contained"
-            onClick={handleAddNode}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              backgroundColor: PRIMARY_GREEN,
-              "&:hover": {
-                backgroundColor: "#3d4d3b",
-              },
-            }}
-          >
-            Add node
-          </Button>
 
           <Button
             variant="outlined"

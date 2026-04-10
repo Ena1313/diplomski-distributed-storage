@@ -39,12 +39,35 @@ async function pickReplicaPaths(fileId, segmentIndex) {
   );
 }
 
+function pickRoundRobinNodes(activeNodes, replicaCount, fileId) {
+  if (activeNodes.length < replicaCount) {
+    throw new Error("Not enough active nodes for replication.");
+  }
+
+  const startIndex = (Number(fileId) - 1) % activeNodes.length;
+  const selectedNodes = [];
+
+  for (let i = 0; i < replicaCount; i += 1) {
+    const nodeIndex = (startIndex + i) % activeNodes.length;
+    selectedNodes.push(activeNodes[nodeIndex]);
+  }
+
+  return selectedNodes;
+}
+
 async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_BYTES) {
   const fileHandle = await fs.promises.open(filePath, "r");
   await fs.promises.mkdir(path.join(SEGMENTS_DIR, String(fileId)), { recursive: true });
 
   let index = 0;
   let position = 0;
+
+  const activeNodes = await getActiveNodes();
+  if (activeNodes.length < TARGET_REPLICA_COUNT) {
+    throw new Error("Not enough active nodes for replication.");
+  }
+
+  const targetNodes = pickRoundRobinNodes(activeNodes, TARGET_REPLICA_COUNT, fileId);
 
   try {
     while (true) {
@@ -65,12 +88,6 @@ async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_B
       );
 
       const segmentId = segmentRun.lastID;
-      const activeNodes = await getActiveNodes();
-      const targetNodes = activeNodes.slice(0, TARGET_REPLICA_COUNT);
-
-      if (targetNodes.length < TARGET_REPLICA_COUNT) {
-        throw new Error("Nema dovoljno aktivnih nodeova za replikaciju (trebaju 2).");
-      }
 
       for (const node of targetNodes) {
         const response = await storeSegmentOnNode(node.baseUrl, fileId, chunkName, chunk);
@@ -85,7 +102,7 @@ async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_B
       position += bytesRead;
     }
 
-    return { segmentsCreated: index };
+    return { segmentsCreated: index, targetNodes: targetNodes.map((node) => node.name) };
   } finally {
     await fileHandle.close();
   }
@@ -189,6 +206,7 @@ module.exports = {
   getActiveNodes,
   getNodeByName,
   pickReplicaPaths,
+  pickRoundRobinNodes,
   segmentFileToDisk,
   rebuildFileToResponse,
   deleteFileArtifacts,
