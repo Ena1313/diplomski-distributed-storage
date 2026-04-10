@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Button, Chip, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography, } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import api, { fetchAllFileDetails, fetchFileDetails } from "../services/api";
+import api, { API_BASE_URL, fetchAllFileDetails, fetchFileDetails } from "../services/api";
 import FileDetailsDialog from "../components/FileDetailsDialog";
 import { calculateFileHealth, formatBytes } from "../utils/storageMetrics";
 
@@ -255,7 +255,7 @@ export default function Files() {
                         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                           <Button
                             component="a"
-                            href={`http://localhost:3000/files/${file.id}/download`}
+                            href={`${API_BASE_URL}/files/${file.id}/download`}
                             variant="outlined"
                             size="small"
                             sx={{
