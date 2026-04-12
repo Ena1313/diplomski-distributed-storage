@@ -147,6 +147,15 @@ app.delete("/segment", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Node service ${NODE_NAME} listening on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Node service ${NODE_NAME} listening on port ${PORT}`);
+  });
+}
+
+module.exports = {
+  app,
+  validateFileId,
+  validateChunkName,
+  safeResolveStoragePath,
+};

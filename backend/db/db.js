@@ -5,7 +5,9 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error('SQLite connect error:', err.message);
   } else {
-    console.log('Connected to SQLite:', DB_PATH);
+    if (process.env.NODE_ENV !== "test") {
+      console.log('Connected to SQLite:', DB_PATH);
+    }
   }
 });
 
