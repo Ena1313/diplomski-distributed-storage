@@ -2,143 +2,157 @@
 
 Projekt predstavlja implementaciju distribuiranog sustava za pohranu datoteka s web sučeljem.
 
+---
+
 ## Arhitektura
 
-Sustav je organiziran kao:
+Sustav je organiziran kao centralno koordinirani distribuirani sustav:
 
-- centralni backend servis (Node.js + Express)
-- više storage node servisa (Docker containeri)
-- frontend aplikacija (React)
+- **backend servis** (Node.js + Express)
+- **storage nodeovi** (Docker containeri)
+- **frontend aplikacija** (React + MUI)
 
-Centralni backend upravlja:
-- uploadom i downloadom datoteka
-- segmentacijom i replikacijom
-- metapodacima (SQLite baza)
-- failover i rebalance logikom
+### Backend
 
-Storage nodeovi:
-- rade kao zasebni servisi
+Backend je glavni koordinator sustava i odgovoran je za:
+
+- upload i download datoteka
+- segmentaciju datoteka (chunkovi od 1MB)
+- izračun checksum-a (SHA-256)
+- replikaciju segmenata (2 replike po segmentu)
+- failover logiku tijekom dohvaćanja
+- rebalance logiku za obnovu replika
+- upravljanje nodeovima
+- vođenje metapodataka u SQLite bazi
+
+### Storage nodeovi
+
+- rade kao zasebni servisi (Docker containeri)
 - imaju vlastiti izolirani storage
+- ne donose odluke
 - komuniciraju s backendom putem HTTP-a
+
+---
 
 ## Funkcionalnosti
 
 - upload i download datoteka
 - segmentacija datoteka (chunkovi od 1MB)
 - replikacija segmenata (2 replike)
+- round-robin raspodjela replika po nodeovima
 - failover (korištenje alternativne replike ako node padne)
 - rebalance (ponovno stvaranje replika)
 - upravljanje nodeovima (aktivacija/deaktivacija)
 - prikaz sustava kroz web UI
+- health status datoteka (Healthy / Degraded / Missing)
 
 ---
+
+## Automatizirani testovi
+
+Za backend su implementirani unit testovi korištenjem Jest frameworka.
+
+Testirani dijelovi sustava:
+
+- pickRoundRobinNodes  
+  → raspodjela replika po nodeovima
+
+- calculateFileHealth  
+  → ispravan prikaz stanja datoteka (Healthy / Degraded / Missing)
+
+- segmentFileToDisk  
+  → segmentacija datoteka i spremanje replika
+
+- rebuildFileToResponse  
+  → failover prilikom dohvaćanja segmenata
+
+- rebalanceSingleFile  
+  → obnova replika na ispravnim nodeovima
+
+Testovi koriste mockanje baze i node komunikacije kako bi se izolirala logika sustava.
+
+---
+
 ## Preduvjeti
 
-Za pokretanje projekta potrebno je imati instalirano:
+Za pokretanje projekta potrebno je imati:
 
-- Docker Desktop: https://www.docker.com/products/docker-desktop/
-- Node.js (za pokretanje frontend aplikacije)
+- Docker Desktop  
+  https://www.docker.com/products/docker-desktop/
+- Node.js (za frontend)
 
-Docker se koristi za pokretanje backend servisa i storage nodeova putem docker-compose konfiguracije.
+---
 
 ## Pokretanje projekta
-### 1. Docker Desktop
-Najprije je potrebno pokrenuti Docker Desktop i pričekati da se Docker potpuno pokrene (status "running").
+
+### 1. Pokrenuti Docker
+
+Pokrenuti Docker Desktop i pričekati da je status running.
+
+---
 
 ### 2. Backend + nodeovi
 
-Zatim je potrebno ući u backend folder i pokrenuti:
-```
-cd backend
-npm install
-docker compose up --build
-```
+cd backend  
+npm install  
+docker compose up --build  
 
-Backend je dostupan na:  
+Backend:  
 http://localhost:3000  
 
 ---
 
 ### 3. Frontend
 
-```
 cd frontend  
 npm install  
 npm run dev  
-```
 
-Frontend je dostupan na:  
+Frontend:  
 http://localhost:5173  
 
 ---
 
-## Testiranje
+## Testiranje sustava
 
 ### Upload i segmentacija
 
-- upload datoteke putem web sučelja
-- datoteka se dijeli na segmente (chunkovi od 1MB)
+- upload datoteke putem UI-a
+- datoteka se dijeli na segmente (1MB)
 - svaki segment se replicira na 2 različita nodea
 
 ---
 
-### Pregled segmenata i replika
+### Pregled replika
 
-- u UI-u je moguće vidjeti:
-  - segmente datoteke
-  - na kojim nodeovima se nalaze replike
-- status datoteke može biti:
-  - **Healthy** – sve replike postoje
-  - **Degraded** – nedostaje jedna replika
-  - **Missing** – segment nema nijednu repliku
-
----
-
-### Failover (pad nodea)
-
-- ručno se ugasi jedan node (Docker container)
-- prilikom download-a:
-  - sustav koristi alternativnu repliku
-  - datoteka se i dalje uspješno rekonstruira
+- moguće vidjeti:
+  - segmente
+  - lokacije replika
+- status:
+  - Healthy
+  - Degraded
+  - Missing
 
 ---
 
-### Simulacija gubitka replika
+### Failover
 
-Za potrebe demonstracije, gubitak replika simulira se uklanjanjem zapisa iz baze podataka (`segment_replicas`).
-
-Stanja sustava:
-- ako postoji barem jedna replika → datoteka je **Degraded**
-- ako ne postoji nijedna replika → datoteka je **Missing**
+- gašenje nodea (Docker stop)
+- download koristi alternativnu repliku
+- datoteka se uspješno rekonstruira
 
 ---
 
 ### Rebalance
 
-- pokretanjem rebalance funkcije:
-  - sustav ponovno stvara nedostajuće replike
+- ponovno stvaranje replika
 - ponašanje:
-  - **Degraded** → rebalance vraća sustav u Healthy stanje
-  - **Missing** → rebalance ne može pomoći (nema izvornog podatka)
+  - Degraded → vraća u Healthy
+  - Missing → nije moguće obnoviti
 
 ---
 
 ### Upravljanje nodeovima
 
-- moguće je:
-  - aktivirati / deaktivirati nodeove
-- deaktivirani nodeovi se ne koriste za:
-  - spremanje novih segmenata
-  - dohvat segmenata
-
----
-
-## Napomena
-
-Svi nodeovi su pokrenuti lokalno putem Docker containera, ali koriste:
-
-- odvojene procese  
-- izolirani storage  
-- mrežnu komunikaciju (HTTP)  
-
-Na taj način sustav simulira distribuirano okruženje i omogućuje demonstraciju tolerancije na greške i redistribucije podataka.
+- aktivacija / deaktivacija nodeova
+- neaktivni nodeovi se ne koriste
