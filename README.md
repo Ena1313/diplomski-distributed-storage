@@ -93,8 +93,7 @@ Pokrenuti Docker Desktop i pričekati da je status running.
 
 ### 2. Backend + nodeovi
 
-cd backend  
-npm install  
+cd backend
 docker compose up --build  
 
 Backend:  
