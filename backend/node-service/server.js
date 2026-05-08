@@ -13,6 +13,18 @@ async function ensureDir(dirPath) {
   await fs.promises.mkdir(dirPath, { recursive: true });
 }
 
+async function removeDirIfEmpty(dirPath) {
+  try {
+    const files = await fs.promises.readdir(dirPath);
+
+    if (files.length === 0) {
+      await fs.promises.rm(dirPath, { recursive: true, force: true });
+    }
+  } catch {
+    // Ako folder ne postoji ili se ne može pročitati, ne rušimo node service.
+  }
+}
+
 function validateFileId(fileId) {
   return /^\d+$/.test(String(fileId));
 }
@@ -56,7 +68,7 @@ app.get("/health", async (req, res) => {
   });
 });
 
-app.post("/store-segment", async (req, res) => { //“Ovo je endpoint na nodeu koji prima HTTP zahtjev.”
+app.post("/store-segment", async (req, res) => {
   try {
     const { fileId, chunkName, contentBase64 } = req.body;
 
@@ -69,7 +81,7 @@ app.post("/store-segment", async (req, res) => { //“Ovo je endpoint na nodeu k
 
     const buffer = Buffer.from(contentBase64, "base64");
 
-    await fs.promises.writeFile(absPath, buffer);//Node zapisuje segment u svoj lokalni storage folder.
+    await fs.promises.writeFile(absPath, buffer);
 
     return res.status(201).json({
       message: "Segment stored",
@@ -90,7 +102,7 @@ app.post("/store-segment", async (req, res) => { //“Ovo je endpoint na nodeu k
   }
 });
 
-app.get("/segment", async (req, res) => {//“Node primi GET zahtjev, pročita segment iz svog storage foldera i vrati ga backendu.”
+app.get("/segment", async (req, res) => {
   try {
     const { fileId, chunkName } = req.query;
 
@@ -127,8 +139,10 @@ app.delete("/segment", async (req, res) => {
       return res.status(400).json({ error: "fileId and chunkName are required." });
     }
 
-    const { absPath } = safeResolveStoragePath(fileId, chunkName);
+    const { fileDir, absPath } = safeResolveStoragePath(fileId, chunkName);
+
     await fs.promises.unlink(absPath);
+    await removeDirIfEmpty(fileDir);
 
     return res.json({
       message: "Segment deleted",
@@ -159,4 +173,5 @@ module.exports = {
   validateFileId,
   validateChunkName,
   safeResolveStoragePath,
+  removeDirIfEmpty,
 };

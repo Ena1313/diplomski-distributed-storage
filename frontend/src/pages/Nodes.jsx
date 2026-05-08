@@ -59,16 +59,6 @@ function Nodes() {
     }
   };
 
-  const handleDeleteNode = async (id) => {
-    try {
-      await api.delete(`/nodes/${id}`);
-      await loadData();
-    } catch (error) {
-      console.error("Error deleting node:", error);
-      alert("Failed to delete node.");
-    }
-  };
-
   const handleRebalance = async () => {
     try {
       const res = await api.post("/rebalance");
@@ -257,36 +247,21 @@ function Nodes() {
                   <TableCell>{node.uniqueSegmentCount}</TableCell>
                   <TableCell>{node.uniqueFileCount}</TableCell>
                   <TableCell>
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => handleToggleNode(node)}
-                        sx={{
-                          textTransform: "none",
-                          borderRadius: 2,
-                          backgroundColor: PRIMARY_GREEN,
-                          "&:hover": {
-                            backgroundColor: "#3d4d3b",
-                          },
-                        }}
-                      >
-                        {Number(node.isActive) === 1 ? "Deactivate" : "Activate"}
-                      </Button>
-
-                      <Button
-                        size="small"
-                        variant="text"
-                        color="error"
-                        onClick={() => handleDeleteNode(node.id)}
-                        sx={{
-                          textTransform: "none",
-                          borderRadius: 2,
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </Box>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => handleToggleNode(node)}
+                      sx={{
+                        textTransform: "none",
+                        borderRadius: 2,
+                        backgroundColor: PRIMARY_GREEN,
+                        "&:hover": {
+                          backgroundColor: "#3d4d3b",
+                        },
+                      }}
+                    >
+                      {Number(node.isActive) === 1 ? "Deactivate" : "Activate"}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
