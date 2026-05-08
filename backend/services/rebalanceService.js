@@ -1,5 +1,6 @@
+const crypto = require("crypto");
 const { dbAll, dbRun } = require("../utils/dbHelpers");
-const { getActiveNodes, getNodeByName, TARGET_REPLICA_COUNT } = require("./storageService");
+const { getActiveNodes, TARGET_REPLICA_COUNT } = require("./storageService");
 const { fetchSegmentFromNode, storeSegmentOnNode } = require("./nodeClient");
 
 let rebalanceRunning = false;
@@ -14,17 +15,17 @@ function setRebalanceRunning(value) {
 
 async function rebalanceSingleFile(fileId) {
   const activeNodes = await getActiveNodes();
+
   if (activeNodes.length < TARGET_REPLICA_COUNT) {
     throw new Error("Trebaju barem 2 aktivna node-a za rebalance.");
-    //Za rebalance trebaju barem 2 aktivna nodea jer je cilj imati 2 replike.
   }
 
-  const activeNodeNames = activeNodes.map((n) => n.name);
-  const activeNodeMap = new Map(activeNodes.map((n) => [n.name, n]));
+  const activeNodeNames = activeNodes.map((node) => node.name);
+  const activeNodeMap = new Map(activeNodes.map((node) => [node.name, node]));
   const activeSet = new Set(activeNodeNames);
 
   const segments = await dbAll(
-    "SELECT id, segmentIndex FROM segments WHERE fileId = ? ORDER BY segmentIndex ASC;",
+    "SELECT id, segmentIndex, checksum FROM segments WHERE fileId = ? ORDER BY segmentIndex ASC;",
     [fileId]
   );
 
@@ -37,19 +38,29 @@ async function rebalanceSingleFile(fileId) {
     );
 
     const existing = [];
+    const preferredRepairNodeNames = [];
     const chunkName = `chunk-${String(segment.segmentIndex).padStart(5, "0")}.bin`;
 
     for (const replica of replicas) {
       if (!activeSet.has(replica.nodeName)) {
         await dbRun("DELETE FROM segment_replicas WHERE id = ?", [replica.id]);
         continue;
-      }//“Backend provjerava postoji li replika na aktivnom nodeu. Ako node nije aktivan ili segment ne može dohvatiti, briše taj zapis iz baze.”
+      }
 
       try {
         const node = activeNodeMap.get(replica.nodeName);
-        await fetchSegmentFromNode(node.baseUrl, fileId, chunkName);
+        const data = await fetchSegmentFromNode(node.baseUrl, fileId, chunkName);
+        const checksum = crypto.createHash("sha256").update(data).digest("hex");
+
+        if (segment.checksum && checksum !== segment.checksum) {
+          preferredRepairNodeNames.push(replica.nodeName);
+          await dbRun("DELETE FROM segment_replicas WHERE id = ?", [replica.id]);
+          continue;
+        }
+
         existing.push(replica);
       } catch {
+        preferredRepairNodeNames.push(replica.nodeName);
         await dbRun("DELETE FROM segment_replicas WHERE id = ?", [replica.id]);
       }
     }
@@ -69,24 +80,52 @@ async function rebalanceSingleFile(fileId) {
 
     const existingNodes = new Set(existing.map((item) => item.nodeName));
 
-    for (const node of activeNodes) {
+    const preferredRepairNodes = activeNodes.filter(
+      (node) =>
+        preferredRepairNodeNames.includes(node.name) &&
+        !existingNodes.has(node.name)
+    );
+
+    const fallbackRepairNodes = activeNodes.filter(
+      (node) =>
+        !preferredRepairNodeNames.includes(node.name) &&
+        !existingNodes.has(node.name)
+    );
+
+    const repairNodeOrder = [...preferredRepairNodes, ...fallbackRepairNodes];
+
+    for (const node of repairNodeOrder) {
       if (existingNodes.size >= TARGET_REPLICA_COUNT) break;
-      if (existingNodes.has(node.name)) continue;
 
-      const response = await storeSegmentOnNode(node.baseUrl, fileId, chunkName, sourceBuffer);
+      try {
+        const response = await storeSegmentOnNode(
+          node.baseUrl,
+          fileId,
+          chunkName,
+          sourceBuffer
+        );
 
-      await dbRun(
-        "INSERT OR IGNORE INTO segment_replicas (segmentId, nodeName, storedPath) VALUES (?, ?, ?)",
-        [segment.id, node.name, response.storedPath]
-      );
+        await dbRun(
+          "INSERT OR IGNORE INTO segment_replicas (segmentId, nodeName, storedPath) VALUES (?, ?, ?)",
+          [segment.id, node.name, response.storedPath]
+        );
 
-      existingNodes.add(node.name);
-      results.push({
-        segmentIndex: segment.segmentIndex,
-        status: "CREATED",
-        nodeName: node.name,
-        storedPath: response.storedPath,
-      });
+        existingNodes.add(node.name);
+
+        results.push({
+          segmentIndex: segment.segmentIndex,
+          status: "CREATED",
+          nodeName: node.name,
+          storedPath: response.storedPath,
+        });
+      } catch (error) {
+        results.push({
+          segmentIndex: segment.segmentIndex,
+          status: "CREATE_FAILED",
+          nodeName: node.name,
+          reason: error.message || String(error),
+        });
+      }
     }
 
     results.push({
@@ -106,20 +145,30 @@ async function rebalanceSingleFile(fileId) {
 }
 
 async function rebalanceAllFiles() {
-  const files = await dbAll('SELECT id FROM files ORDER BY id ASC;');
+  const files = await dbAll("SELECT id FROM files ORDER BY id ASC;");
   const results = [];
 
   for (const file of files) {
     try {
       const single = await rebalanceSingleFile(file.id);
-      results.push({ fileId: file.id, activeNodes: single.activeNodes, status: 'DONE', results: single.results });
+
+      results.push({
+        fileId: file.id,
+        activeNodes: single.activeNodes,
+        status: "DONE",
+        results: single.results,
+      });
     } catch (error) {
-      results.push({ fileId: file.id, status: 'FAILED', reason: error.message });
+      results.push({
+        fileId: file.id,
+        status: "FAILED",
+        reason: error.message,
+      });
     }
   }
 
   return {
-    message: 'global rebalance done',
+    message: "global rebalance done",
     filesProcessed: results.length,
     results,
   };

@@ -165,6 +165,105 @@ async function rebuildFileToResponse(fileId, res) {//za download filea
   return { notFound: false, fileRow };
 }
 
+async function getFileDetailsWithLiveHealth(fileId) {
+  const file = await dbGet("SELECT * FROM files WHERE id = ?", [fileId]);
+
+  if (!file) {
+    return null;
+  }
+
+  const segments = await dbAll(
+    "SELECT * FROM segments WHERE fileId = ? ORDER BY segmentIndex ASC;",
+    [fileId]
+  );
+
+  const replicas = await dbAll(
+    `
+      SELECT sr.*, s.segmentIndex, s.checksum
+      FROM segment_replicas sr
+      JOIN segments s ON sr.segmentId = s.id
+      WHERE s.fileId = ?
+      ORDER BY s.segmentIndex ASC, sr.nodeName ASC
+    `,
+    [fileId]
+  );
+
+  const nodes = await dbAll("SELECT name, baseUrl, isActive FROM nodes;");
+  const nodeMap = new Map(nodes.map((node) => [node.name, node]));
+
+  const validReplicaCountBySegmentId = new Map();
+  const checkedReplicas = [];
+
+  for (const replica of replicas) {
+    const node = nodeMap.get(replica.nodeName);
+    const chunkName = `chunk-${String(replica.segmentIndex).padStart(5, "0")}.bin`;
+
+    let actualStatus = "OK";
+    let actualExists = false;
+
+    if (!node) {
+      actualStatus = "NODE NOT FOUND";
+    } else if (Number(node.isActive) !== 1) {
+      actualStatus = "NODE INACTIVE";
+    } else {
+      try {
+        const data = await fetchSegmentFromNode(node.baseUrl, fileId, chunkName);
+        const checksum = crypto.createHash("sha256").update(data).digest("hex");
+
+        if (replica.checksum && checksum !== replica.checksum) {
+          actualStatus = "CHECKSUM MISMATCH";
+        } else {
+          actualExists = true;
+          const currentCount = validReplicaCountBySegmentId.get(replica.segmentId) || 0;
+          validReplicaCountBySegmentId.set(replica.segmentId, currentCount + 1);
+        }
+      } catch {
+        actualStatus = "MISSING ON DISK";
+      }
+    }
+
+    checkedReplicas.push({
+      ...replica,
+      actualExists,
+      actualStatus,
+    });
+  }
+
+  const checkedSegments = segments.map((segment) => {
+    const validReplicaCount = validReplicaCountBySegmentId.get(segment.id) || 0;
+
+    let healthStatus = "Missing";
+
+    if (validReplicaCount >= TARGET_REPLICA_COUNT) {
+      healthStatus = "Healthy";
+    } else if (validReplicaCount > 0) {
+      healthStatus = "Degraded";
+    }
+
+    return {
+      ...segment,
+      validReplicaCount,
+      targetReplicaCount: TARGET_REPLICA_COUNT,
+      healthStatus,
+    };
+  });
+
+  let fileHealthStatus = "Healthy";
+
+  if (checkedSegments.some((segment) => segment.healthStatus === "Missing")) {
+    fileHealthStatus = "Missing";
+  } else if (checkedSegments.some((segment) => segment.healthStatus === "Degraded")) {
+    fileHealthStatus = "Degraded";
+  }
+
+  return {
+    file,
+    segments: checkedSegments,
+    replicas: checkedReplicas,
+    healthStatus: fileHealthStatus,
+  };
+}
+
 async function deleteFileArtifacts(fileId, storedAs) {
   if (storedAs) {
     const uploadPath = path.join(UPLOADS_DIR, storedAs);
@@ -211,5 +310,6 @@ module.exports = {
   pickRoundRobinNodes,
   segmentFileToDisk,
   rebuildFileToResponse,
+  getFileDetailsWithLiveHealth,
   deleteFileArtifacts,
 };

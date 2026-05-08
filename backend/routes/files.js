@@ -8,6 +8,7 @@ const {
   CHUNK_SIZE_BYTES,
   segmentFileToDisk,
   rebuildFileToResponse,
+  getFileDetailsWithLiveHealth,
   deleteFileArtifacts,
 } = require("../services/storageService");
 
@@ -126,37 +127,17 @@ router.get("/files/:id/replicas", async (req, res) => {
   }
 });
 
+//details više ne čita samo bazu, nego stvarno pita nodeove postoji li segment
 router.get("/files/:id/details", async (req, res) => {
   try {
     const fileId = Number(req.params.id);
+    const details = await getFileDetailsWithLiveHealth(fileId);
 
-    const file = await dbGet("SELECT * FROM files WHERE id = ?", [fileId]);
-
-    if (!file) {
+    if (!details) {
       return res.status(404).json({ error: "File not found" });
     }
 
-    const segments = await dbAll(
-      "SELECT * FROM segments WHERE fileId = ? ORDER BY segmentIndex ASC;",
-      [fileId]
-    );
-
-    const replicas = await dbAll(
-      `
-        SELECT sr.*, s.segmentIndex
-        FROM segment_replicas sr
-        JOIN segments s ON sr.segmentId = s.id
-        WHERE s.fileId = ?
-        ORDER BY s.segmentIndex ASC, sr.nodeName ASC
-      `,
-      [fileId]
-    );
-
-    return res.json({
-      file,
-      segments,
-      replicas,
-    });
+    return res.json(details);
   } catch (error) {
     return res.status(500).json({ error: error.message || String(error) });
   }

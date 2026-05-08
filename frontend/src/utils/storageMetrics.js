@@ -26,10 +26,17 @@ export function calculateFileHealth(detail) {
   let missingSegments = 0;
 
   for (const segment of segments) {
-    const replicaCount = replicas.filter((r) => r.segmentIndex === segment.segmentIndex).length;
-    if (replicaCount === 0) {
+    const validReplicaCount =
+      segment.validReplicaCount ??
+      replicas.filter(
+        (r) => r.segmentIndex === segment.segmentIndex && r.actualExists !== false
+      ).length;
+
+    const targetReplicaCount = segment.targetReplicaCount ?? 2;
+
+    if (validReplicaCount === 0) {
       missingSegments += 1;
-    } else if (replicaCount < 2) {
+    } else if (validReplicaCount < targetReplicaCount) {
       degradedSegments += 1;
     }
   }
@@ -74,7 +81,7 @@ export function buildNodeOverview(nodes = [], allDetails = []) {
 
     for (const detail of allDetails) {
       for (const replica of detail.replicas || []) {
-        if (replica.nodeName === node.name) {
+        if (replica.nodeName === node.name && replica.actualExists !== false) {
           replicaCount += 1;
           segmentIds.add(replica.segmentId);
           fileIds.add(detail.file.id);
@@ -94,7 +101,11 @@ export function buildNodeOverview(nodes = [], allDetails = []) {
 export function buildSystemOverview(nodes = [], allDetails = []) {
   const totalFiles = allDetails.length;
   const totalSegments = allDetails.reduce((sum, detail) => sum + (detail.segments?.length || 0), 0);
-  const totalReplicas = allDetails.reduce((sum, detail) => sum + (detail.replicas?.length || 0), 0);
+  const totalReplicas = allDetails.reduce(
+    (sum, detail) =>
+      sum + (detail.replicas || []).filter((replica) => replica.actualExists !== false).length,
+    0
+  );
   const activeNodes = nodes.filter((node) => Number(node.isActive) === 1).length;
   const inactiveNodes = nodes.length - activeNodes;
 

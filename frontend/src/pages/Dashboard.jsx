@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, Grid, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography, } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import api, { fetchAllFileDetails, fetchNodesOverview, fetchSystemOverview, } from "../services/api";
-import { calculateFileHealth } from "../utils/storageMetrics";
+import api, { fetchAllFileDetails, fetchNodesOverview } from "../services/api";
+import { calculateFileHealth, buildNodeOverview, buildSystemOverview } from "../utils/storageMetrics";
 
 const PRIMARY_GREEN = "#495a47";
 const LIGHT_GREEN = "#eef3ee";
@@ -54,8 +54,7 @@ export default function Dashboard() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [systemOverview, nodesOverview, allDetails] = await Promise.all([
-        fetchSystemOverview(),
+      const [nodesOverview, allDetails] = await Promise.all([
         fetchNodesOverview(),
         fetchAllFileDetails(),
       ]);
@@ -73,8 +72,8 @@ export default function Dashboard() {
         };
       });
 
-      setOverview(systemOverview);
-      setNodeOverview(nodesOverview);
+      setOverview(buildSystemOverview(nodesOverview, allDetails));
+      setNodeOverview(buildNodeOverview(nodesOverview, allDetails));
       setFileHealthSummary(summary);
     } catch (error) {
       console.error(error);
@@ -270,7 +269,7 @@ export default function Dashboard() {
                   <TableCell sx={{ fontWeight: 700 }}>Node</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Replicas</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Segments</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Valid Segments</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Files</TableCell>
                 </TableRow>
               </TableHead>

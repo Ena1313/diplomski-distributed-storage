@@ -68,7 +68,8 @@ app.post("/store-segment", async (req, res) => { //“Ovo je endpoint na nodeu k
     await ensureDir(fileDir);
 
     const buffer = Buffer.from(contentBase64, "base64");
-    await fs.promises.writeFile(absPath, buffer);
+
+    await fs.promises.writeFile(absPath, buffer);//Node zapisuje segment u svoj lokalni storage folder.
 
     return res.status(201).json({
       message: "Segment stored",
@@ -89,7 +90,7 @@ app.post("/store-segment", async (req, res) => { //“Ovo je endpoint na nodeu k
   }
 });
 
-app.get("/segment", async (req, res) => {
+app.get("/segment", async (req, res) => {//“Node primi GET zahtjev, pročita segment iz svog storage foldera i vrati ga backendu.”
   try {
     const { fileId, chunkName } = req.query;
 

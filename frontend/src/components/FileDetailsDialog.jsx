@@ -14,6 +14,7 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
   const file = details?.file;
   const segments = details?.segments || [];
   const replicas = details?.replicas || [];
+  const healthStatus = details?.healthStatus;
 
   const labelStyle = {
     color: "#495a47",
@@ -124,6 +125,23 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                   <Typography sx={labelStyle}>Created</Typography>
                   <Typography sx={valueStyle}>{file.createdAt}</Typography>
                 </Box>
+                <Box>
+                  <Typography sx={labelStyle}>Health</Typography>
+                  <Typography
+                    sx={{
+                      ...valueStyle,
+                      fontWeight: 700,
+                      color:
+                        healthStatus === "Healthy"
+                          ? "#2e7d32"
+                          : healthStatus === "Degraded"
+                            ? "#ed6c02"
+                            : "#d32f2f",
+                    }}
+                  >
+                    {healthStatus || "Unknown"}
+                  </Typography>
+                </Box>
               </Box>
             </Paper>
 
@@ -151,6 +169,8 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                     <TableRow sx={{ backgroundColor: "#d5e1d9" }}>
                       <TableCell sx={{ fontWeight: 700 }}>Segment</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Size</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Health</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Replicas</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Checksum</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
                     </TableRow>
@@ -169,6 +189,23 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                           <TableCell>{formatBytes(segment.sizeBytes)}</TableCell>
                           <TableCell
                             sx={{
+                              fontWeight: 700,
+                              color:
+                                segment.healthStatus === "Healthy"
+                                  ? "#2e7d32"
+                                  : segment.healthStatus === "Degraded"
+                                    ? "#ed6c02"
+                                    : "#d32f2f",
+                            }}
+                          >
+                            {segment.healthStatus}
+                          </TableCell>
+
+                          <TableCell>
+                            {segment.validReplicaCount ?? 0}/{segment.targetReplicaCount ?? 2}
+                          </TableCell>
+                          <TableCell
+                            sx={{
                               wordBreak: "break-all",
                               maxWidth: 360,
                               fontFamily: "monospace",
@@ -182,7 +219,7 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4}>
+                        <TableCell colSpan={6}>
                           <Typography color="text.secondary" sx={{ py: 1 }}>
                             No segments available.
                           </Typography>
@@ -220,6 +257,7 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                       <TableCell sx={{ fontWeight: 700 }}>Node</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Stored path</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Actual status</TableCell>
                       <TableCell sx={{ fontWeight: 700 }}>Copy</TableCell>
                     </TableRow>
                   </TableHead>
@@ -246,6 +284,17 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                             {replica.storedPath}
                           </TableCell>
                           <TableCell>{replica.createdAt}</TableCell>
+                          <TableCell
+                            sx={{
+                              fontWeight: 700,
+                              color: replica.actualExists ? "#2e7d32" : "#d32f2f",
+                            }}
+                          >
+                            {replica.actualStatus
+                              ?.replaceAll("_", " ")
+                              .toLowerCase()
+                              .replace(/\b\w/g, (char) => char.toUpperCase())}
+                          </TableCell>
                           <TableCell>
                             <Button
                               size="small"
@@ -269,7 +318,7 @@ export default function FileDetailsDialog({ open, onClose, details, loading }) {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5}>
+                        <TableCell colSpan={6}>
                           <Typography color="text.secondary" sx={{ py: 1 }}>
                             No replicas available.
                           </Typography>
