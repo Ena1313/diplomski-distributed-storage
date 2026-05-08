@@ -16,6 +16,7 @@ async function rebalanceSingleFile(fileId) {
   const activeNodes = await getActiveNodes();
   if (activeNodes.length < TARGET_REPLICA_COUNT) {
     throw new Error("Trebaju barem 2 aktivna node-a za rebalance.");
+    //Za rebalance trebaju barem 2 aktivna nodea jer je cilj imati 2 replike.
   }
 
   const activeNodeNames = activeNodes.map((n) => n.name);
@@ -42,7 +43,7 @@ async function rebalanceSingleFile(fileId) {
       if (!activeSet.has(replica.nodeName)) {
         await dbRun("DELETE FROM segment_replicas WHERE id = ?", [replica.id]);
         continue;
-      }
+      }//“Backend provjerava postoji li replika na aktivnom nodeu. Ako node nije aktivan ili segment ne može dohvatiti, briše taj zapis iz baze.”
 
       try {
         const node = activeNodeMap.get(replica.nodeName);

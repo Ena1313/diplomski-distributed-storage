@@ -56,7 +56,7 @@ app.get("/health", async (req, res) => {
   });
 });
 
-app.post("/store-segment", async (req, res) => {
+app.post("/store-segment", async (req, res) => { //“Ovo je endpoint na nodeu koji prima HTTP zahtjev.”
   try {
     const { fileId, chunkName, contentBase64 } = req.body;
 

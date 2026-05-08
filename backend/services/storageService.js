@@ -5,8 +5,8 @@ const { SEGMENTS_DIR, UPLOADS_DIR } = require("../config/paths");
 const { dbAll, dbGet, dbRun } = require("../utils/dbHelpers");
 const { storeSegmentOnNode, fetchSegmentFromNode, deleteSegmentFromNode } = require("./nodeClient");
 
-const CHUNK_SIZE_BYTES = 1024 * 1024;
-const TARGET_REPLICA_COUNT = 2;
+const CHUNK_SIZE_BYTES = 1024 * 1024;//ovdje postavljam segment velicine 1MB
+const TARGET_REPLICA_COUNT = 2;//dvije replike
 
 async function removeDirIfExists(dirPath) {
   try {
@@ -62,12 +62,12 @@ async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_B
   let index = 0;
   let position = 0;
 
-  const activeNodes = await getActiveNodes();
+  const activeNodes = await getActiveNodes();//Adrese nodeova dolaze iz baze
   if (activeNodes.length < TARGET_REPLICA_COUNT) {
     throw new Error("Not enough active nodes for replication.");
   }
 
-  const targetNodes = pickRoundRobinNodes(activeNodes, TARGET_REPLICA_COUNT, fileId);
+  const targetNodes = pickRoundRobinNodes(activeNodes, TARGET_REPLICA_COUNT, fileId);//Zatim backend bira nodeove (round robin) na koje će poslati segmente.
 
   try {
     while (true) {
@@ -79,9 +79,9 @@ async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_B
       const chunkName = `chunk-${String(index).padStart(5, "0")}.bin`;
       const chunkAbsPath = path.join(SEGMENTS_DIR, String(fileId), chunkName);
 
-      await fs.promises.writeFile(chunkAbsPath, chunk);
+      await fs.promises.writeFile(chunkAbsPath, chunk);//spremi lokalno segmente filea
 
-      const checksum = crypto.createHash("sha256").update(chunk).digest("hex");
+      const checksum = crypto.createHash("sha256").update(chunk).digest("hex");//checksum otisak prsta segmenta
       const segmentRun = await dbRun(
         "INSERT INTO segments (fileId, segmentIndex, sizeBytes, checksum) VALUES (?, ?, ?, ?)",
         [fileId, index, bytesRead, checksum]
@@ -90,7 +90,7 @@ async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_B
       const segmentId = segmentRun.lastID;
 
       for (const node of targetNodes) {
-        const response = await storeSegmentOnNode(node.baseUrl, fileId, chunkName, chunk);
+        const response = await storeSegmentOnNode(node.baseUrl, fileId, chunkName, chunk);//Za svaki node backend šalje HTTP POST zahtjev.
 
         await dbRun(
           "INSERT OR IGNORE INTO segment_replicas (segmentId, nodeName, storedPath) VALUES (?, ?, ?)",
@@ -108,8 +108,8 @@ async function segmentFileToDisk(filePath, fileId, chunkSizeBytes = CHUNK_SIZE_B
   }
 }
 
-async function rebuildFileToResponse(fileId, res) {
-  const fileRow = await dbGet("SELECT * FROM files WHERE id = ?", [fileId]);
+async function rebuildFileToResponse(fileId, res) {//za download filea
+  const fileRow = await dbGet("SELECT * FROM files WHERE id = ?", [fileId]); //uzmi redom segmente po indexid i rekonstruiraj ih
   if (!fileRow) {
     return { notFound: true };
   }
@@ -123,7 +123,7 @@ async function rebuildFileToResponse(fileId, res) {
   );
 
   for (const segment of segments) {
-    const replicaCandidates = await pickReplicaPaths(fileId, segment.segmentIndex);
+    const replicaCandidates = await pickReplicaPaths(fileId, segment.segmentIndex);//za svaki segment trazi dostupne replike u bazi
 
     if (!replicaCandidates.length) {
       throw new Error(`Missing replicas for segmentIndex=${segment.segmentIndex}`);
@@ -132,15 +132,16 @@ async function rebuildFileToResponse(fileId, res) {
     const chunkName = `chunk-${String(segment.segmentIndex).padStart(5, "0")}.bin`;
     let delivered = false;
 
-    for (const replica of replicaCandidates) {
+    for (const replica of replicaCandidates) {//failover
       try {
         const node = await getNodeByName(replica.nodeName);
         if (!node || Number(node.isActive) !== 1) {
           continue;
         }
 
-        const data = await fetchSegmentFromNode(node.baseUrl, fileId, chunkName);
+        const data = await fetchSegmentFromNode(node.baseUrl, fileId, chunkName);//“Ovo je HTTP GET prema nodeu. Backend traži konkretan segment.”
         const checksum = crypto.createHash("sha256").update(data).digest("hex");
+        //ako jedan node ne radi, ako nije active, ako GET request pukne ili checksum nije dobar, backend ide na continue i proba sljedeću repliku.”
 
         if (replica.checksum && checksum !== replica.checksum) {
           continue;
@@ -151,6 +152,7 @@ async function rebuildFileToResponse(fileId, res) {
         break;
       } catch {
         // failover: try next replica
+        //Ova petlja prolazi kroz replike dok ne pronađe onu koja je dostupna i ispravna.
       }
     }
 
